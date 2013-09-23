@@ -1,0 +1,2 @@
+eye.svg: <a href="http://thenounproject.com/noun/eye/#icon-No421" target="_blank">Eye</a>  from The Noun Project
+airplay.svg: <a href="http://thenounproject.com/noun/airplay/#icon-No11233" target="_blank">AirPlay</a> designed by <a href="http://thenounproject.com/johncaserta" target="_blank">John Caserta</a> from The Noun Project

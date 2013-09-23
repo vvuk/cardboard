@@ -2,11 +2,61 @@
 <html>
 <head>
   <meta charset="utf-8"></meta>
+  <script src="lib/jquery-2.0.3.min.js"></script>
   <script src="lib/crafty.js"></script>
 
   <script src="src/game.js"></script>
+
+  <style type="text/css">
+#cardbuttons {
+    display: none;
+
+    position: relative;
+    top: 0;
+    /*
+      left: -70px;
+      border-radius: 7px 0px 0px 7px;
+      background: #aaa;
+    */
+    left: 0;
+    border_radius: 0px 7px 7px 0px;
+    background: rgba(160, 160, 160, 0.5);
+
+    width: 120px;
+    height: 100%;
+}
+
+.cardbutton {
+    border: 10px solid transparent;
+    width: 100px;
+    height: 100px;
+
+    background-position: 50% 50%;
+    background-repeat: no-repeat;
+    background-size: contain;
+}
+
+#cardbutton-eye {
+    background-image: url(assets/icons/eye.svg);
+}
+
+#cardbutton-play {
+    background-image: url(assets/icons/airplay.svg);
+}
+
+.cardbutton:hover {
+    background-color: rgba(220, 220, 220, 0.7);
+}
+
+.cardimage {
+}
+  </style>
 </head>
 
 <body>
+  <div id="cardbuttons">
+    <div id="cardbutton-eye" class="cardbutton" title="Inspect this card"></div>
+    <div id="cardbutton-play" class="cardbutton" title="Reveal this card and move it to play area"></div>
+  </div>
 </body>
 </html>
