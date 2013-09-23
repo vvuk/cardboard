@@ -2,6 +2,26 @@
 
 var RENDERTYPE = "DOM, ";
 
+function shuffleArray(array) {
+  for (var i = array.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var temp = array[i];
+    array[i] = array[j];
+    array[j] = temp;
+  }
+  return array;
+}
+
+function pad0(num, length) {
+  var num = "" + num;
+  while (num.length < length) {
+    num = "0" + num;
+  }
+  return num;
+}
+
+// This should represent one physical card.  You can have multiple cards of the same type,
+// e.g. if you have multiple copies of a card in a deck.
 Crafty.c("Card", {
   _set: null,   // arbitrary set that this card belongs to; just for identification (e.g. expansion name etc.)
   _index: -1,   // must be a number; should be unique overall for the game
@@ -40,10 +60,102 @@ Crafty.c("Stack", {
   // "all", "owner", "none"
   _stackVisibility: "owner",
   // hand, draw stack
-  _stackType: "hand"
+  _stackType: "hand",
 
+  // will be an array of Card entities
+  _cards: null,
+
+  _defineGetterSetters: function() {
+    // stack.cards is the real array of cards
+    Object.defineProperty(this, 'cards', {
+      get: function() { return this._cards; },
+      set: function(v) { this.setCards(v); }
+    });
+
+    // stack.size is the number of cards
+    Object.defineProperty(this, 'size', {
+      get: function() { return this._cards.length; }
+    });
+  },
+
+  init: function() {
+    this._defineGetterSetters();
+    this._cards = [];
+  },
+
+  setCards: function(cards) {
+    this._cards = [];
+    this.addCards(cards);
+  },
+
+  addCards: function(cards) {
+    for (var i = 0; i < cards.length; ++i) {
+      var c = cards[i];
+      if (!c.has("Card")) throw "card is not a card";
+
+      // can't have duplicate cards; they need to be distinct objects
+      if (c in this._cards) throw "duplicate card object";
+
+      this._cards.push(c);
+    }
+    this.trigger("Change");
+  },
+
+  shuffle: function() {
+    shuffleArray(this._cards);
+    this.trigger("Change");
+  },
+
+  // "Draw" takes and removes the cards
+  draw1: function() {
+    return this.drawN(1)[0];
+  },
+
+  drawN: function(n) {
+    if (!n) throw "invalid N";
+
+    var cards = [];
+    n = Math.min(n, this.size);
+    while (n--)
+      cards.push(this.cards.pop())
+    this.trigger("Change");
+    return cards;
+  },
+
+  // "Pick" just takes the cards, but doesn't remove them
+  pick1: function() {
+    return this.size > 0 ? this.cards[this.cards.length-1] : null;
+  },
+
+  pickN: function(n) {
+    if (!n) throw "invalid N";
+
+    var cards = [];
+    n = Math.min(n, this.size);
+    for (var i = 0; i < n; ++i)
+      cards.push(this.cards[this.cards.length - i - 1]);
+    return cards;
+  },
+
+  pickRandom1: function() {
+    return this.pickRandomN(1)[0];
+  },
+
+  pickRanomN: function(n) {
+    if (!n) throw "invalid N";
+
+    var cards = [];
+    n = Math.min(n, this.size);
+    var pickTmp = Array(this.size);
+    for (var i = 0; i < this.size; ++i)
+      pickTmp[i] = i;
+
+    for (var i = 0; i < n; ++i) {
+      var index = Math.floor(Math.random() * pickTmp.length);
+      cards.push(this.cards[pickTmp.splice(index, 1, 0)[0]]);
+    }
+  },
 });
-
 
 Crafty.c("CardImage", {
   _card: null,
@@ -116,8 +228,6 @@ Crafty.c("CardImage", {
     }
 
     if (this._card != card) {
-      console.log("setCard card", card);
-
       if (this._card) {
         this._card.unbind("Change", this._cardChangeCallback);
       }
@@ -151,6 +261,64 @@ Crafty.c("CardImage", {
   },
 });
 
+Crafty.c("StackImage", {
+  _stack: null,
+});
+
+Crafty.c("HandImage", {
+  // the stack that's the hand
+  _hand: null,
+  _handImages: null,
+
+  _defineGettersSetters: function() {
+    Object.defineProperty(this, "hand", {
+      get: function() { return this._hand; },
+      set: function(v) { this.setHand(v); }
+    });
+  },
+
+  init: function() {
+    this._defineGettersSetters();
+  },
+
+  setHand: function(stack) {
+    if (this._hand != stack) {
+      var self = this;
+      if (!this._stackChange) {
+        this._stackChange = function(e) {
+          self._rebuildHand();
+        };
+      }
+
+      if (this._hand)
+        this._hand.unbind("Change", this._stackChange);
+      this._hand = stack;
+      this._hand.bind("Change", this._stackChange);
+      this._rebuildHand();
+    }
+  },
+
+  _rebuildHand: function() {
+    if (this._handImages) {
+      for (var i = 0; i < this._handImages.length; ++i) {
+        this._handImages[i].destroy();
+      }
+    }
+
+    this._handImages = [];
+
+    for (var i = 0; i < this._hand.size; ++i) {
+      var card = this._hand.cards[i];
+      var cardimage = Crafty.e(RENDERTYPE + 'CardImage')
+        .attr({ x: Game.board.grid + (Game.board.grid + Game.card.width) * i,
+                y: Game.board.height - (Game.board.grid + Game.card.height) * 1,
+                card: card,
+                faceUp: true });
+      this._handImages.push(cardimage);
+    }
+  },
+});
+
 var State = {
   selectedCardImage: null
 };
@@ -159,7 +327,7 @@ var Game = {
   board: {
     grid: 10,
     width: 1920,
-    height: 1080,
+    height: 1500,
   },
 
   card: {
@@ -212,14 +380,15 @@ var Game = {
       e.preventDefault();
     });
 
-    var corpCard = Crafty.e('Card').attr({ set: "core",
-                                           index: 1,
-                                           cardFront: "assets/anr/core/card-001.jpg",
-                                           cardBack: "assets/anr/corp-back.jpg" });
-    var runnerCard = Crafty.e('Card').attr({ set: "core",
-                                             index: 33,
-                                             cardFront: "assets/anr/core/card-033.jpg",
-                                             cardBack: "assets/anr/runner-back.jpg" });
+    function makeCard(index, isRunner) {
+      return Crafty.e('Card').attr({ set: "core",
+                                     index: index,
+                                     cardFront: "assets/anr/core/card-" + pad0(index, 3) + ".jpg",
+                                     cardBack: isRunner ? "assets/anr/runner-back.jpg" : "assets/anr/corp-back.jpg" });
+    }
+
+    var corpCard = makeCard(1, false);
+    var runnerCard = makeCard(33, true);
 
     // Place a card at the top left and the bottom right
     Crafty.e(RENDERTYPE + 'CardImage, Draggable')
@@ -228,11 +397,20 @@ var Game = {
               card: corpCard,
               faceUp: true });
 
-    Crafty.e(RENDERTYPE + 'CardImage, Draggable')
+    Crafty.e(RENDERTYPE + 'CardImage')
       .attr({ x: Game.board.grid,
-              y: Game.board.height - Game.board.grid - Game.card.height,
+              y: Game.board.height - (Game.board.grid + Game.card.height) * 2,
               card: runnerCard,
               faceUp: true });
+
+    var handStack = Crafty.e("Stack");
+    var cards = [];
+    for (var i = 38; i < 38+5; ++i) {
+      cards.push(makeCard(i, true));
+    }
+    handStack.cards = cards;
+
+    Crafty.e("HandImage").attr({ hand: handStack });
   }
 };
 
