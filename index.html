@@ -3,8 +3,14 @@
 <head>
   <meta charset="utf-8"></meta>
   <script src="lib/jquery-2.0.3.min.js"></script>
-  <script src="lib/crafty.js"></script>
+  <script src="lib/jquery-ui-1.10.3.custom.min.js"></script>
+  <script src="lib/json2.js"></script>
+  <script src="lib/underscore.js"></script>
+  <script src="lib/backbone.js"></script>
+  <link rel="stylesheet" href="css/ui-lightness/jquery-ui-1.10.3.custom.min.css"/>
 
+
+  <script src="assets/anr/set-01.js"></script>
   <script src="src/game.js"></script>
 
   <style type="text/css">
@@ -19,7 +25,7 @@
       background: #aaa;
     */
     left: 0;
-    border_radius: 0px 7px 7px 0px;
+    border-radius: 0px 7px 7px 0px;
     background: rgba(160, 160, 160, 0.5);
 
     width: 120px;
@@ -50,6 +56,42 @@
 
 .cardimage {
 }
+
+.card {
+    display: inline-block;
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+
+.identity-card {
+    display: block;
+}
+
+.hand > .card {
+    margin: 5px;
+}
+
+#table {
+    //transform: scale(0.5, 0.5);
+    //transform-origin: top left;
+}
+
+.hand {
+    transform: scale(0.5, 0.5);
+    transform-origin: top left;
+    width: 200%;
+    height: 200%;
+
+    background: gray;
+    padding: 5px;
+    border: 2px solid blue;
+}
+
+
+.card:hover {
+    opacity: 0.7;
+}
+
   </style>
 </head>
 
@@ -58,5 +100,12 @@
     <div id="cardbutton-eye" class="cardbutton" title="Inspect this card"></div>
     <div id="cardbutton-play" class="cardbutton" title="Reveal this card and move it to play area"></div>
   </div>
+
+  <div id="big-card">
+  </div>
+
+  <button id="drawone">Draw One</button>
+  <button id="discard1">Discard One</button>
+  <div id="table"></div>
 </body>
 </html>

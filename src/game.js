@@ -1,6 +1,7 @@
-/* -*- Mode: javascript; indent-tabs-mode: nil; tab-width: 40; js-indent-level: 2 -*- */
-
-var RENDERTYPE = "DOM, ";
+function randomInt(n) {
+  // random integer from 0..n-1
+  return Math.floor(n * Math.random());
+}
 
 function shuffleArray(array) {
   for (var i = array.length - 1; i > 0; i--) {
@@ -20,398 +21,282 @@ function pad0(num, length) {
   return num;
 }
 
-// This should represent one physical card.  You can have multiple cards of the same type,
-// e.g. if you have multiple copies of a card in a deck.
-Crafty.c("Card", {
-  _set: null,   // arbitrary set that this card belongs to; just for identification (e.g. expansion name etc.)
-  _index: -1,   // must be a number; should be unique overall for the game
-  _cardFront: null,
-  _cardBack: null,
+function buildGettersSetters(obj) {
+  if (!("simpleAttributes" in obj))
+    return;
 
-  _defineGetterSetters: function() {
-    Object.defineProperty(this, 'cardFront', {
-      set: function(v) { if (this._cardFront != v) { this._cardFront = v; this.trigger("Change"); } },
-      get: function() { return this._cardFront; }
-    });
+  function buildGetter(attr) {
+    return function() { return this.get(attr); }
+  }
 
-    Object.defineProperty(this, 'cardBack', {
-      set: function(v) { if (this._cardBack != v) { this._cardBack = v; this.trigger("Change"); } },
-      get: function() { return this._cardBack; }
-    });
+  function buildSetter(attr) {
+    return function(v) { this.set(attr, v); return v; }
+  }
 
-    Object.defineProperty(this, 'cardSet', {
-      set: function(v) { if (this._set != v) { this._set = v; this.trigger("Change"); } },
-      get: function(v) { return this._set; }
+  for (var i = 0; i < obj.simpleAttributes.length; ++i) {
+    var attr = obj.simpleAttributes[i];
+    Object.defineProperty(obj, attr, {
+      get: buildGetter(attr),
+      set: buildSetter(attr)
     });
+  }
+}
 
-    Object.defineProperty(this, 'cardIndex', {
-      set: function(v) { if (!Number.isInteger(v)) { throw "cardIndex must be an integer"; }
-                         if (this._index != v) { this._index = v; this.trigger("Change"); } },
-      get: function(v) { return this._index; }
-    });
+// A basic Card.  It only has the card's attributes;
+// cardNum might be -1, in which case the card isn't known yet.
+//
+// Backbone models all have an internal id that's unique, so we
+// can distinguish between different unknown cards for purposes
+// of serialization.
+//
+// A card should only belong in one displayed view.
+var Card = Backbone.Model.extend({
+  defaults: {
+    cardNum: -1,
+    faceUp: true,
+    tapped: false
   },
 
-  init: function() {
-    this._defineGetterSetters();
+  simpleAttributes: [ "cardNum",
+		      "frontImage", "backImage",
+		      "faceUp", "tapped" ],
+
+  constructor: function(options) {
+    buildGettersSetters(this);
+    Backbone.Model.prototype.constructor.call(this, options);
   },
+
+  isKnown: function() {
+    return this.cardNum != -1;
+  },
+
+  visibleFace: function() {
+    return this.faceUp ? this.frontImage : this.backImage;
+  },
+
+  tap: function() { this.tapped = true; },
+  untap: function() { this.tapped = false; },
 });
 
-Crafty.c("Stack", {
-  // "all", "owner", "none"
-  _stackVisibility: "owner",
-  // hand, draw stack
-  _stackType: "hand",
+// A collection of cards.
+var CardSet = Backbone.Collection.extend({
+  model: Card
+});
 
-  // will be an array of Card entities
-  _cards: null,
-
-  _defineGetterSetters: function() {
-    // stack.cards is the real array of cards
-    Object.defineProperty(this, 'cards', {
-      get: function() { return this._cards; },
-      set: function(v) { this.setCards(v); }
+// A stack of cards, along with some manipulations.
+// Internally, it maintains a CardSet that represents
+// its cards.  A card really should be in only one
+// Stack at a time.
+// XXX enforce this somehow.
+var Stack = Backbone.Model.extend({
+  constructor: function(options) {
+    Object.defineProperty(this, "size", {
+      get: function() { return this.cards.size(); }
     });
 
-    // stack.size is the number of cards
-    Object.defineProperty(this, 'size', {
-      get: function() { return this._cards.length; }
-    });
+    Backbone.Model.prototype.constructor.call(this, options);
   },
 
-  init: function() {
-    this._defineGetterSetters();
-    this._cards = [];
+  initialize: function() {
+    this.cards = new CardSet;
   },
 
-  setCards: function(cards) {
-    this._cards = [];
-    this.addCards(cards);
+  addCard: function(card) {
+    this.cards.add(card);
+    return this;
   },
 
   addCards: function(cards) {
-    for (var i = 0; i < cards.length; ++i) {
-      var c = cards[i];
-      if (!c.has("Card")) throw "card is not a card";
-
-      // can't have duplicate cards; they need to be distinct objects
-      if (c in this._cards) throw "duplicate card object";
-
-      this._cards.push(c);
-    }
-    this.trigger("Change");
+    cards.each(function(c) { this.cards.add(c); }, this);
+    return this;
   },
 
   shuffle: function() {
-    shuffleArray(this._cards);
-    this.trigger("Change");
+    this.cards.reset(this.cards.shuffle());
+    return this;
   },
 
-  // "Draw" takes and removes the cards
+  // Draw: Take and remove 1, N cards from the front
   draw1: function() {
-    return this.drawN(1)[0];
+    if (this.size == 0)
+      return null;
+    return this.cards.shift();
   },
 
-  drawN: function(n) {
-    if (!n) throw "invalid N";
-
-    var cards = [];
+  draw: function(n) {
     n = Math.min(n, this.size);
+    var drawResult = new CardSet;
     while (n--)
-      cards.push(this.cards.pop())
-    this.trigger("Change");
-    return cards;
+      drawResult.add(this.cards.shift());
+    return drawResult;
   },
 
-  // "Pick" just takes the cards, but doesn't remove them
-  pick1: function() {
-    return this.size > 0 ? this.cards[this.cards.length-1] : null;
+  // like draw(), but draws random cards
+  drawRandom1: function() {
+    if (this.size == 0)
+      return null;
+    var m = this.cards.at(randomInt(this.size));
+    this.cards.remove(m);
+    return m;
   },
 
-  pickN: function(n) {
-    if (!n) throw "invalid N";
+  drawRandom: function(n) {
+    var drawResult;
+    if (n >= this.size) {
+      drawResult = this.cards.clone();
+      this.cards.reset();
+      return drawResult;
+    }
 
-    var cards = [];
-    n = Math.min(n, this.size);
-    for (var i = 0; i < n; ++i)
-      cards.push(this.cards[this.cards.length - i - 1]);
-    return cards;
-  },
-
-  pickRandom1: function() {
-    return this.pickRandomN(1)[0];
-  },
-
-  pickRanomN: function(n) {
-    if (!n) throw "invalid N";
-
-    var cards = [];
-    n = Math.min(n, this.size);
-    var pickTmp = Array(this.size);
-    for (var i = 0; i < this.size; ++i)
-      pickTmp[i] = i;
-
+    drawResult = new CardSet;
     for (var i = 0; i < n; ++i) {
-      var index = Math.floor(Math.random() * pickTmp.length);
-      cards.push(this.cards[pickTmp.splice(index, 1, 0)[0]]);
+      var m = this.cards.at(randomInt(this.size));
+      this.cards.remove(m);
+      drawResult.add(m);
     }
+    return drawResult;
   },
+
+  // Peek: Peek at 1, N cards from the front (don't remove)
+  peek1: function() {
+    if (this.size == 0)
+      return null;
+    return this.cards.at(0);
+  },
+
+  peek: function(n) {
+    n = Math.min(n, this.size);
+    var peekResult = new CardSet;
+    for (var i = 0; i < n; ++i)
+      peekResult.add(this.cards.at(i));
+    return peekResult;
+  },
+
+  // like peek(), but peeks random cards
+  // XXX todo jfc.
 });
 
-Crafty.c("CardImage", {
-  _card: null,
-  _faceUp: false,
+//
+// Views
+//
 
-  _defineGettersSetters: function() {
-    Object.defineProperty(this, 'card', {
-      set: function(v) { this.setCard(v); },
-      get: function() { return this._card; }
+// A plain card.  Displays the currently visible face, rotated
+// 90 degrees if tapped.
+var CardView = Backbone.View.extend({
+  tagName: "div",
+  className: "card",
+
+  initialize: function() {
+    this.model.on('change', this.render, this);
+    this.$el.draggable();
+  },
+
+  render: function() {
+    this.$el.empty();
+    this.$el.css({
+      "width": App.CARD_WIDTH + "px",
+      "height": App.CARD_HEIGHT + "px",
+      "background-image": "url(" + this.model.visibleFace() + ")"
     });
-
-    Object.defineProperty(this, 'faceUp', {
-      set: function(v) { this.setFaceUp(v); },
-      get: function() { return this._faceUp; }
-    });
+    return this;
   },
 
-  init: function() {
-    this.requires("2D, Image, Mouse");
-    this._defineGettersSetters();
-
-    if (this.has("DOM")) {
-      this.addClass("cardimage");
-    }
-
-    // when any card is clicked, we want to show a large image of it
-    // and then hide it when it's clicked anywhere
-    var self = this;
-    this.bind('Click', function(e) {
-      if (!self._card)
-        return;
-
-      var buttons = self._getButtons();
-      buttons.style.display = "block";
-      this._element.appendChild(buttons);
-      State.selectedCardImage = self;
-    });
+  events: {
+    "click": "flip"
   },
 
-  _getButtons: function() {
-    var buttons = document.getElementById("cardbuttons");
-    if (buttons.parentElement) {
-      buttons.parentElement.removeChild(buttons);
-    }
-    return buttons;
-  },
-
-  _cardFace: function() {
-    return this._faceUp ? this._card.cardFront : this._card.cardBack;
-  },
-
-  setFaceUp: function(faceup) {
-    if (this._faceUp == faceup)
-      return;
-
-    this._faceUp = faceup;
-    this.image(this._cardFace());
-  },
-
-  setCard: function(card, faceup) {
-    if (!card.has("Card")) {
-      throw "card must have Card component";
-    }
-
-    var needsChange = false;
-
-    if (faceup !== undefined) {
-      this._faceUp = faceup;
-      needsChange = true;
-    }
-
-    if (this._card != card) {
-      if (this._card) {
-        this._card.unbind("Change", this._cardChangeCallback);
-      }
-
-      if (!this._cardChangeCallback) {
-        var self = this;
-        this._cardChangeCallback = function(e) {
-          self.onCardChange(e);
-        };
-      }
-
-      this._card = card;
-
-      if (card) {
-        card.bind("Change", this._cardChangeCallback);
-        this.image(this._cardFace());
-      } else {
-        this.image(null);
-      }
-
-      needsChange = false;
-    }
-
-    if (needsChange) {
-      this.trigger("Change");
-    }
-  },
-
-  onCardChange: function(e) {
-    this.image(this._cardFace());
-  },
-});
-
-Crafty.c("StackImage", {
-  _stack: null,
-});
-
-Crafty.c("HandImage", {
-  // the stack that's the hand
-  _hand: null,
-  _handImages: null,
-
-  _defineGettersSetters: function() {
-    Object.defineProperty(this, "hand", {
-      get: function() { return this._hand; },
-      set: function(v) { this.setHand(v); }
-    });
-  },
-
-  init: function() {
-    this._defineGettersSetters();
-  },
-
-  setHand: function(stack) {
-    if (this._hand != stack) {
-      var self = this;
-      if (!this._stackChange) {
-        this._stackChange = function(e) {
-          self._rebuildHand();
-        };
-      }
-
-      if (this._hand)
-        this._hand.unbind("Change", this._stackChange);
-      this._hand = stack;
-      this._hand.bind("Change", this._stackChange);
-      this._rebuildHand();
-    }
-  },
-
-  _rebuildHand: function() {
-    if (this._handImages) {
-      for (var i = 0; i < this._handImages.length; ++i) {
-        this._handImages[i].destroy();
-      }
-    }
-
-    this._handImages = [];
-
-    for (var i = 0; i < this._hand.size; ++i) {
-      var card = this._hand.cards[i];
-      var cardimage = Crafty.e(RENDERTYPE + 'CardImage')
-        .attr({ x: Game.board.grid + (Game.board.grid + Game.card.width) * i,
-                y: Game.board.height - (Game.board.grid + Game.card.height) * 1,
-                card: card,
-                faceUp: true });
-      this._handImages.push(cardimage);
-    }
-  },
-});
-
-var State = {
-  selectedCardImage: null
-};
-
-var Game = {
-  board: {
-    grid: 10,
-    width: 1920,
-    height: 1500,
-  },
-
-  card: {
-    width: 320,
-    height: 450
-  },
-
-  width: function() {
-    return this.board.width;
-  },
-
-  height: function() {
-    return this.board.height;
-  },
-
-  // Initialize and start our game
-  start: function() {
-    // Start crafty and set a background color so that we can see it's working
-    Crafty.init(Game.width(), Game.height());
-
-    Crafty.background('rgb(200, 200, 220)');
-    Crafty.viewport.mouselook(true);
-    Crafty.viewport.scale(0.5);
-    Crafty.viewport.clampToEntities = false;
-
-    $("#cardbutton-eye").click(function(e) {
-      // how'd this get clicked?
-      if (!State.selectedCardImage)
-        return;
-
-      console.log("click", State.selectedCardImage);
-
-      var bigCard = Crafty.e(RENDERTYPE + "CardImage").attr({x: 100, y: 100,
-                                                             h: Game.board.height * 0.75,
-                                                             z: 100,
-                                                             card: State.selectedCardImage.card,
-                                                             faceUp: State.selectedCardImage.faceUp
-                                                            });
-      // grab the mouse while this is up, so that we can destroy it
-      Crafty.pushMouseGrabFunction(function(e) {
-        if (e.type == "click") {
-          bigCard.destroy();
-          Crafty.popMouseGrabFunction();
-          return true;
-        }
-        return true;
-      });
-
-      e.stopPropagation();
-      e.preventDefault();
-    });
-
-    function makeCard(index, isRunner) {
-      return Crafty.e('Card').attr({ set: "core",
-                                     index: index,
-                                     cardFront: "assets/anr/core/card-" + pad0(index, 3) + ".jpg",
-                                     cardBack: isRunner ? "assets/anr/runner-back.jpg" : "assets/anr/corp-back.jpg" });
-    }
-
-    var corpCard = makeCard(1, false);
-    var runnerCard = makeCard(33, true);
-
-    // Place a card at the top left and the bottom right
-    Crafty.e(RENDERTYPE + 'CardImage, Draggable')
-      .attr({ x: Game.board.grid,
-              y: Game.board.grid,
-              card: corpCard,
-              faceUp: true });
-
-    Crafty.e(RENDERTYPE + 'CardImage')
-      .attr({ x: Game.board.grid,
-              y: Game.board.height - (Game.board.grid + Game.card.height) * 2,
-              card: runnerCard,
-              faceUp: true });
-
-    var handStack = Crafty.e("Stack");
-    var cards = [];
-    for (var i = 38; i < 38+5; ++i) {
-      cards.push(makeCard(i, true));
-    }
-    handStack.cards = cards;
-
-    Crafty.e("HandImage").attr({ hand: handStack });
+  flip: function() {
+    this.model.faceUp = !this.model.faceUp;
   }
+});
+
+var HandView = Backbone.View.extend({
+  tagName: "div",
+  className: "hand",
+
+  initialize: function() {
+    console.log("this.model ", this.model);
+    this.model.cards.on("add", this.render, this);
+    this.model.cards.on("remove", this.render, this);
+  },
+
+  render: function() {
+    this.$el.empty();
+    this.model.cards.each(function(card) {
+      var cardView = new CardView({ model: card });
+      this.$el.append(cardView.render().el);
+    }, this);
+    return this;
+  },
+});
+
+// all of our app globals
+var App = {
+  CARD_WIDTH: 320,
+  CARD_HEIGHT: 450,
+
+  hand: null,
+  deck: null,
+
+  init: function() {
+    this.hand = new Stack;
+    this.deck = new Stack;
+  },
 };
 
-window.addEventListener('load', Game.start);
+function getCard(num) {
+  var P = "assets/anr/";
+  return new Card({cardNum: num,
+		   frontImage: P+"cards/card-" + pad0(num, 5) + ".jpg",
+		   backImage: P+"runner-back.jpg"});
+}
+
+function setupGame() {
+  App.init();
+
+  var runnerDeck = [1, "01001", 3, "01002", 3, "01050", 1, "02035", 2, "01007", 3, "01008", 3, "01009", 2, "02003", 2, "01010", 3, "01012", 1, "01014", 3, "01051", 3, "02047", 3, "01006", 2, "02009", 3, "02022", 3, "02053", 2, "02054", 3, "01047"];
+  for (var i = 0; i < runnerDeck.length / 2; ++i) {
+    var count = runnerDeck[i*2];
+    var cardnum = runnerDeck[i*2+1];
+    for (var j = 0; j < count; ++j) {
+      App.deck.addCard(getCard(parseInt(cardnum, 10)));
+    }
+  }
+
+  // the first card is the identity
+  App.identityCard = App.deck.draw1();
+  var padnum = pad0(App.identityCard.cardNum, 5);
+  var idset = padnum.substr(0,2);
+  if (CardDetails[idset][padnum].type != "Identity") {
+    alert("First card in deck is not an Identity!  Got: " + CardDetails[idset][padnum].type + " instead. Invalid deck.");
+    return;
+  }
+
+  // build a view for the identity
+  App.identityCardView = new CardView({model: App.identityCard});
+  App.identityCardView.render()
+    .$el
+    .addClass("identity-card")
+    .appendTo("#table");
+  
+  // now do the same for the handd
+  App.handView = new HandView({model: App.hand});
+  App.handView.render()
+    .$el
+    .appendTo("#table");
+
+  // and then shuffle the deck
+  App.deck.shuffle();
+  App.hand.addCards(App.deck.draw(5));
+
+  $("#drawone").click(function() {
+    var card = App.deck.draw1();
+    App.hand.addCard(card);
+  });
+
+  $("#discard1").click(function() {
+    var c = App.hand.draw1();
+  });
+}
+
+$(setupGame);
