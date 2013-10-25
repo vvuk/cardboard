@@ -14,7 +14,7 @@
   <script src="src/game.js"></script>
 
   <style type="text/css">
-#cardbuttons {
+.cardbuttons {
     display: none;
 
     position: relative;
@@ -42,7 +42,7 @@
     background-size: contain;
 }
 
-#cardbutton-eye {
+.cardbutton-eye {
     background-image: url(assets/icons/eye.svg);
 }
 
@@ -87,7 +87,6 @@
     border: 2px solid blue;
 }
 
-
 .card:hover {
     opacity: 0.7;
 }
@@ -96,16 +95,14 @@
 </head>
 
 <body>
-  <div id="cardbuttons">
-    <div id="cardbutton-eye" class="cardbutton" title="Inspect this card"></div>
-    <div id="cardbutton-play" class="cardbutton" title="Reveal this card and move it to play area"></div>
-  </div>
-
   <div id="big-card">
   </div>
 
   <button id="drawone">Draw One</button>
   <button id="discard1">Discard One</button>
+  <button onclick="TogetherJS(this); return false;">Start TogetherJS</button>
   <div id="table"></div>
+
+<!--  <script src="https://togetherjs.com/togetherjs-min.js"></script> -->
 </body>
 </html>

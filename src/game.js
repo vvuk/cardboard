@@ -3,6 +3,10 @@ function randomInt(n) {
   return Math.floor(n * Math.random());
 }
 
+function clamp(n, min, max) {
+  return Math.max(Math.min(n, max), min);
+}
+
 function shuffleArray(array) {
   for (var i = array.length - 1; i > 0; i--) {
     var j = Math.floor(Math.random() * (i + 1));
@@ -40,6 +44,12 @@ function buildGettersSetters(obj) {
       set: buildSetter(attr)
     });
   }
+}
+
+// scale an element, while keeping it the same physical size
+function scaleView(el, scale)
+{
+
 }
 
 // A basic Card.  It only has the card's attributes;
@@ -185,14 +195,32 @@ var Stack = Backbone.Model.extend({
 var CardView = Backbone.View.extend({
   tagName: "div",
   className: "card",
+  scale: 0.5,
 
   initialize: function() {
     this.model.on('change', this.render, this);
-    this.$el.draggable();
+    var self = this;
+    this.$el.draggable({
+      start: function(event, ui) {
+        ui.position.left = 0;
+        ui.position.top = 0;
+	console.log("start");
+      },
+      drag: function(event, ui) {
+        var changeLeft = ui.position.left - ui.originalPosition.left;
+        var newLeft = ui.originalPosition.left + changeLeft / self.scale;
+
+        var changeTop = ui.position.top - ui.originalPosition.top;
+        var newTop = ui.originalPosition.top + changeTop / self.scale;
+        ui.position.left = newLeft;
+        ui.position.top = newTop;
+	console.log("now", newLeft, newTop, changeLeft);
+      }
+    });
   },
 
   render: function() {
-    this.$el.empty();
+    this.$el.empty().append(this.templateFn());
     this.$el.css({
       "width": App.CARD_WIDTH + "px",
       "height": App.CARD_HEIGHT + "px",
@@ -200,6 +228,12 @@ var CardView = Backbone.View.extend({
     });
     return this;
   },
+
+  templateFn: _.template(" \
+    <div class='cardbuttons'> \
+      <div class='cardbutton cardbutton-eye'></div> \
+      <div class='cardbutton cardbutton-play'></div> \
+    </div>"),
 
   events: {
     "click": "flip"
@@ -227,6 +261,98 @@ var HandView = Backbone.View.extend({
       this.$el.append(cardView.render().el);
     }, this);
     return this;
+  },
+});
+
+var BoardModel = Backbone.Model.extend({
+  defaults: {
+  },
+
+  width: 1000,
+  height: 600,
+  cards: null,
+  cardPositions: null,
+
+  constructor: function(options) {
+    Backbone.Model.prototype.constructor.call(this, options);
+  },
+
+  initialize: function() {
+    this.cards = new CardSet;
+    this.cardPositions = [];
+  },
+
+  // put the given card in play, either in the middle of the play stack
+  addCard: function(card) {
+    // push the position first, because adding to the cards set will trigger
+    // the view to get this card's position
+    var x = Math.floor(width / 2);
+    var y = Math.floor(height / 2);
+
+    this.cardPositions.push(x);
+    this.cardPositions.push(y);
+
+    this.cards.append(card);
+
+    this.trigger("cardAdded", card, this.cards.length - 1, x, y);
+  },
+
+  removeCard: function(card) {
+    var i = this.cards.indexOf(card);
+    if (i == -1) throw "Card not part of the board!";
+
+    var ox = this.cardPositions[i*2+0];
+    var oy = this.cardPositions[i*2+1];
+
+    this.cards.remove(card);
+
+    this.trigger("cardRemoved", card, i, ox, oy);
+
+    return card;
+  },
+
+  moveCardTo: function(card, x, y) {
+    var i = this.cards.indexOf(card);
+    if (i == -1) throw "Card not part of the board!";
+
+    var ox = this.cardPositions[i*2+0];
+    var oy = this.cardPositions[i*2+1];
+
+    this.cardPositions[i*2+0] = clamp(x, 0, this.width);
+    this.cardPositions[i*2+1] = clamp(y, 0, this.height);
+
+    this.trigger("cardMoved", card, i, x, y, ox, oy);
+  },
+
+  getCardPos: function(card) {
+    var i = this.cards.indexOf(card);
+    if (i == -1) return null;
+
+    return [this.cardPositions[i*2+0], this.cardPositions[i*2+1]];
+  }
+});
+
+var BoardView = Backbone.View.extend({
+  tagName: "div",
+  className: "board",
+
+  initialize: function() {
+    this.model.on('cardAdded', this.cardAdded, this);
+    this.model.on('cardRemoved', this.cardRemoved, this);
+    this.model.on('cardMoved', this.cardMoved, this);
+  },
+
+  render: function() {
+    this.$el.empty();
+  },
+
+  cardAdded: function(card, cardIndex, x, y) {
+  },
+
+  cardRemoved: function(card, cardIndex, x, y) {
+  },
+
+  cardMoved: function(card, cardIndex, x, y, ox, oy) {
   },
 });
 
