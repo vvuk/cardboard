@@ -195,7 +195,7 @@ var Stack = Backbone.Model.extend({
 var CardView = Backbone.View.extend({
   tagName: "div",
   className: "card",
-  scale: 0.5,
+  scale: 0.5, // this should match the CSS scaling applied to this element
 
   initialize: function() {
     this.model.on('change', this.render, this);
@@ -236,12 +236,25 @@ var CardView = Backbone.View.extend({
     </div>"),
 
   events: {
-    "click": "flip"
+    "click": "select",
+    "click .cardbutton-eye": "flip",
+    "click .cardbutton-play": "play",
   },
 
-  flip: function() {
+  flip: function(ev) {
+    console.log("flip", ev);
     this.model.faceUp = !this.model.faceUp;
-  }
+    return true;
+  },
+
+  select: function(ev) {
+    console.log("select", ev);
+    this.$el.toggleClass("selected");
+    return true;
+  },
+
+  play: function(ev) {
+  },
 });
 
 var HandView = Backbone.View.extend({
@@ -404,7 +417,7 @@ function setupGame() {
     .$el
     .addClass("identity-card")
     .appendTo("#table");
-  
+
   // now do the same for the handd
   App.handView = new HandView({model: App.hand});
   App.handView.render()

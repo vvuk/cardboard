@@ -25,11 +25,25 @@
       background: #aaa;
     */
     left: 0;
-    border-radius: 0px 7px 7px 0px;
-    background: rgba(160, 160, 160, 0.5);
+    border-radius: 7px 0px 0px 7px;
+    background: red; /*rgba(160, 160, 160, 0.2);*/
 
     width: 120px;
     height: 100%;
+}
+
+/* for desktop */
+.card:hover > .cardbuttons {
+    display: block;
+}
+
+/* for mobile */
+.card.selected {
+    border: 5px solid red;
+}
+
+.card.selected > .cardbuttons {
+    display: block;
 }
 
 .cardbutton {
@@ -46,7 +60,7 @@
     background-image: url(assets/icons/eye.svg);
 }
 
-#cardbutton-play {
+.cardbutton-play {
     background-image: url(assets/icons/airplay.svg);
 }
 
@@ -85,10 +99,6 @@
     background: gray;
     padding: 5px;
     border: 2px solid blue;
-}
-
-.card:hover {
-    opacity: 0.7;
 }
 
   </style>
