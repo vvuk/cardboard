@@ -4,6 +4,9 @@
     background-image: url("@{base-assets}/@{icon}");
 }
 
+@cardbutton-size: 50px;
+@cardbutton-border: 5px;
+
 .card {
     border: @card-border-width solid transparent;
 
@@ -36,14 +39,14 @@
     border-radius: 7px 0px 0px 7px;
     background: red; /*rgba(160, 160, 160, 0.2);*/
 
-    width: 120px;
+    width: (@cardbutton-size + 2 * @cardbutton-border);
     height: 100%;
 }
 
 .cardbutton {
-    border: 10px solid transparent;
-    width: 100px;
-    height: 100px;
+    border: @cardbutton-border solid transparent;
+    width: @cardbutton-size;
+    height: @cardbutton-size;
 
     background-position: 50% 50%;
     background-repeat: no-repeat;
@@ -75,20 +78,18 @@
     display: block;
 }
 
-.hand > .card {
-    margin: 5px;
-}
-
 #table {
     //transform: scale(0.5, 0.5);
     //transform-origin: top left;
 }
 
 .hand {
-    transform: scale(0.5, 0.5);
-    transform-origin: top left;
-    width: 200%;
-    height: 200%;
+    //transform: scale(0.5, 0.5);
+    //transform-origin: top left;
+    //width: 200%;
+    //height: 200%;
+
+    width: 100%;
 
     background: gray;
     padding: 5px;

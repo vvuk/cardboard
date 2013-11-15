@@ -371,8 +371,11 @@ var BoardView = Backbone.View.extend({
 
 // all of our app globals
 var App = {
-  CARD_WIDTH: 320,
-  CARD_HEIGHT: 450,
+  //CARD_WIDTH: 320,
+  //CARD_HEIGHT: 450,
+  CARD_WIDTH: 160,
+  CARD_HEIGHT: 225,
+
 
   hand: null,
   deck: null,
