@@ -7,101 +7,16 @@
   <script src="lib/json2.js"></script>
   <script src="lib/underscore.js"></script>
   <script src="lib/backbone.js"></script>
+
   <link rel="stylesheet" href="css/ui-lightness/jquery-ui-1.10.3.custom.min.css"/>
 
-
   <script src="assets/anr/set-01.js"></script>
+
   <script src="src/game.js"></script>
 
-  <style type="text/css">
-.cardbuttons {
-    display: none;
-
-    position: relative;
-    top: 0;
-    /*
-      left: -70px;
-      border-radius: 7px 0px 0px 7px;
-      background: #aaa;
-    */
-    left: 0;
-    border-radius: 7px 0px 0px 7px;
-    background: red; /*rgba(160, 160, 160, 0.2);*/
-
-    width: 120px;
-    height: 100%;
-}
-
-/* for desktop */
-.card:hover > .cardbuttons {
-    display: block;
-}
-
-/* for mobile */
-.card.selected {
-    border: 5px solid red;
-}
-
-.card.selected > .cardbuttons {
-    display: block;
-}
-
-.cardbutton {
-    border: 10px solid transparent;
-    width: 100px;
-    height: 100px;
-
-    background-position: 50% 50%;
-    background-repeat: no-repeat;
-    background-size: contain;
-}
-
-.cardbutton-eye {
-    background-image: url(assets/icons/eye.svg);
-}
-
-.cardbutton-play {
-    background-image: url(assets/icons/airplay.svg);
-}
-
-.cardbutton:hover {
-    background-color: rgba(220, 220, 220, 0.7);
-}
-
-.cardimage {
-}
-
-.card {
-    display: inline-block;
-    background-repeat: no-repeat;
-    background-size: cover;
-}
-
-.identity-card {
-    display: block;
-}
-
-.hand > .card {
-    margin: 5px;
-}
-
-#table {
-    //transform: scale(0.5, 0.5);
-    //transform-origin: top left;
-}
-
-.hand {
-    transform: scale(0.5, 0.5);
-    transform-origin: top left;
-    width: 200%;
-    height: 200%;
-
-    background: gray;
-    padding: 5px;
-    border: 2px solid blue;
-}
-
-  </style>
+  <!-- LESS script load must come after all less sheets -->
+  <link rel="stylesheet/less" type="text/css" href="css/main.less"/>
+  <script src="lib/less-1.5.0.min.js"></script>
 </head>
 
 <body>
