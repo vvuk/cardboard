@@ -201,6 +201,12 @@ var CardView = Backbone.View.extend({
     this.model.on('change', this.render, this);
     var self = this;
     this.$el.draggable({
+      revert: "invalid",
+      distance: 3,
+      //grid: [5, 5],
+
+/*
+      // this is code that tries to take into account css scale
       start: function(event, ui) {
         ui.position.left = 0;
         ui.position.top = 0;
@@ -215,7 +221,8 @@ var CardView = Backbone.View.extend({
         ui.position.left = newLeft;
         ui.position.top = newTop;
 	console.log("now", newLeft, newTop, changeLeft);
-      }
+      },
+*/
     });
   },
 
@@ -265,6 +272,15 @@ var HandView = Backbone.View.extend({
     console.log("this.model ", this.model);
     this.model.cards.on("add", this.render, this);
     this.model.cards.on("remove", this.render, this);
+
+    this.$el.droppable({
+      accept: ".card",
+      hoverClass: "hand-card-drop-hover",
+      drop: function(event, ui) {
+        var cv = ui.draggable.backboneView();
+        console.log("would drop ", cv);
+      }
+    });
   },
 
   render: function() {
@@ -286,21 +302,17 @@ var BoardModel = Backbone.Model.extend({
   cards: null,
   cardPositions: null,
 
-  constructor: function(options) {
-    Backbone.Model.prototype.constructor.call(this, options);
-  },
-
   initialize: function() {
     this.cards = new CardSet;
     this.cardPositions = [];
   },
 
   // put the given card in play, either in the middle of the play stack
-  addCard: function(card) {
+  addCard: function(card, x, y) {
     // push the position first, because adding to the cards set will trigger
     // the view to get this card's position
-    var x = Math.floor(width / 2);
-    var y = Math.floor(height / 2);
+    x = x === undefined ? Math.floor(width / 2) : x;
+    y = y === undefined ? Math.floor(height / 2) : y;
 
     this.cardPositions.push(x);
     this.cardPositions.push(y);
@@ -353,6 +365,20 @@ var BoardView = Backbone.View.extend({
     this.model.on('cardAdded', this.cardAdded, this);
     this.model.on('cardRemoved', this.cardRemoved, this);
     this.model.on('cardMoved', this.cardMoved, this);
+
+    this.$el.droppable({
+      accept: ".card",
+      hoverClass: "board-card-drop-hover",
+      drop: function(event, ui) {
+        var cv = ui.draggable.backboneView();
+        if (!cv)
+          return;
+
+        var m = cv.model;
+
+        console.log("(board) would drop ", cv);
+      }
+    });
   },
 
   render: function() {
@@ -383,6 +409,7 @@ var App = {
   init: function() {
     this.hand = new Stack;
     this.deck = new Stack;
+    this.board = new BoardModel;
   },
 };
 
@@ -414,14 +441,19 @@ function setupGame() {
     return;
   }
 
+  // build a view for the board
+  App.boardView = new BoardView({model: App.board})
+    .$el
+    .appendTo("#table");
+
   // build a view for the identity
   App.identityCardView = new CardView({model: App.identityCard});
   App.identityCardView.render()
     .$el
     .addClass("identity-card")
-    .appendTo("#table");
+    .appendTo("#table .board");
 
-  // now do the same for the handd
+  // build a view for the hand
   App.handView = new HandView({model: App.hand});
   App.handView.render()
     .$el
